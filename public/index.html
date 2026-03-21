@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SalariuOK.ro – Ești plătit corect?</title>
+  <meta name="description" content="Verifică dacă ești plătit corect față de piața din România. Introdu jobul, orașul și salariul tău și află scorul tău de salarizare în câteva secunde." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  
+  <!-- Google AdSense -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-YOUR_PUBLISHER_ID" crossorigin="anonymous"></script>
+</head>
+<body>
+  <!-- Animated background particles -->
+  <div class="bg-particles" aria-hidden="true">
+    <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+  </div>
+
+  <header class="site-header">
+    <div class="logo" id="logo-home" role="button" tabindex="0" aria-label="Înapoi la pagina principală">
+      <span class="logo-icon">💼</span>
+      <span class="logo-text">SalariuOK<span class="logo-dot">.ro</span></span>
+    </div>
+    <div class="header-stats" id="headerStats" aria-live="polite"></div>
+  </header>
+
+  <!-- ============ FORM SECTION ============ -->
+  <main id="formSection" class="section active" aria-label="Formular verificare salariu">
+    <div class="hero-text">
+      <p class="hero-eyebrow">🔎 Analiză salariu în timp real</p>
+      <h1 class="hero-title">Ești plătit<br /><span class="gradient-text">corect?</span></h1>
+      <p class="hero-subtitle">Compară salariul tău cu piața și descoperă ce ar trebui să câștigi de fapt.</p>
+    </div>
+
+    <form id="salaryForm" class="form-card glass-card" novalidate aria-label="Formular salariu">
+      <!-- Job Title -->
+      <div class="form-group" id="group-jobTitle">
+        <label for="jobTitle">Titlul jobului tău</label>
+        <div class="input-wrapper">
+          <span class="input-icon">👨‍💻</span>
+          <input
+            type="text"
+            id="jobTitle"
+            name="jobTitle"
+            placeholder="ex: Developer, Marketing Manager…"
+            autocomplete="off"
+            aria-required="true"
+            aria-describedby="jobTitle-error"
+          />
+          <div class="autocomplete-dropdown" id="jobSuggestions" role="listbox" aria-label="Sugestii job"></div>
+        </div>
+        <span class="field-error" id="jobTitle-error" role="alert"></span>
+      </div>
+
+      <!-- Location -->
+      <div class="form-group" id="group-location">
+        <label for="location">Orașul</label>
+        <div class="input-wrapper">
+          <span class="input-icon">📍</span>
+          <input
+            type="text"
+            id="location"
+            name="location"
+            placeholder="ex: București, Cluj-Napoca…"
+            autocomplete="off"
+            aria-required="true"
+            aria-describedby="location-error"
+          />
+          <div class="autocomplete-dropdown" id="locationSuggestions" role="listbox" aria-label="Sugestii oraș"></div>
+        </div>
+        <span class="field-error" id="location-error" role="alert"></span>
+      </div>
+
+      <!-- Experience -->
+      <div class="form-group" id="group-experience">
+        <label for="experience">Ani de experiență: <strong id="expValue">3</strong></label>
+        <div class="slider-wrapper">
+          <span class="slider-label">0</span>
+          <input
+            type="range"
+            id="experience"
+            name="experience"
+            min="0" max="20" value="3"
+            aria-label="Ani de experiență"
+            aria-valuenow="3" aria-valuemin="0" aria-valuemax="20"
+          />
+          <span class="slider-label">20+</span>
+        </div>
+        <div class="exp-labels">
+          <span>Junior</span><span>Mid</span><span>Senior</span><span>Lead</span>
+        </div>
+      </div>
+
+      <!-- Salary -->
+      <div class="form-group" id="group-salary">
+        <label for="salary">Salariul lunar net (RON)</label>
+        <div class="input-wrapper">
+          <span class="input-icon">💰</span>
+          <input
+            type="number"
+            id="salary"
+            name="salary"
+            placeholder="ex: 5000"
+            min="100"
+            aria-required="true"
+            aria-describedby="salary-error"
+          />
+          <span class="input-suffix">RON</span>
+        </div>
+        <span class="field-error" id="salary-error" role="alert"></span>
+      </div>
+
+      <button type="submit" id="submitBtn" class="cta-button" aria-label="Verifică salariul meu">
+        <span class="btn-text">Verifică salariul meu</span>
+        <span class="btn-arrow">→</span>
+      </button>
+
+      <p class="privacy-note" role="note">
+        🔒 Datele tale sunt anonime și ajută la îmbunătățirea preciziei analizei.
+      </p>
+    </form>
+
+    <!-- AdSense Banner - Home -->
+    <div class="ad-container">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-YOUR_PUBLISHER_ID"
+           data-ad-slot="YOUR_AD_SLOT_ID_HERE"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+      <script>
+           (adsbygoogle = window.adsbygoogle || []).push({});
+      </script>
+    </div>
+  </main>
+
+  <!-- ============ LOADING SECTION ============ -->
+  <div id="loadingSection" class="section" aria-live="polite" aria-label="Se analizează salariul">
+    <div class="loading-card glass-card">
+      <div class="loading-spinner" aria-hidden="true">
+        <div class="spinner-ring"></div>
+        <div class="spinner-ring"></div>
+        <div class="spinner-ring"></div>
+      </div>
+      <p class="loading-title">Se analizează salariul tău…</p>
+      <p class="loading-sub" id="loadingStep">Normalizăm titlul jobului…</p>
+    </div>
+  </div>
+
+  <!-- ============ RESULTS SECTION ============ -->
+  <section id="resultsSection" class="section" aria-label="Rezultatele analizei" aria-live="polite">
+    <div class="results-wrapper">
+
+      <!-- Score Card -->
+      <div class="score-card glass-card" id="scoreCard">
+        <div class="score-ring-wrapper" aria-hidden="true">
+          <svg class="score-ring" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#00D4AA;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#00A8FF;stop-opacity:1" />
+              </linearGradient>
+            </defs>
+            <circle class="ring-bg" cx="100" cy="100" r="85" />
+            <circle class="ring-fill" id="ringFill" cx="100" cy="100" r="85" />
+          </svg>
+          <div class="score-center">
+            <span class="score-emoji" id="scoreEmoji">🙂</span>
+            <span class="score-number" id="scoreNumber">0</span>
+            <span class="score-label-sub">/ 100</span>
+          </div>
+        </div>
+        <div class="score-label" id="scoreLabel">Bun</div>
+        <div class="score-job" id="scoreJob"></div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+
+        <!-- Suggested Salary -->
+        <div class="stat-card glass-card" id="suggestedCard">
+          <div class="stat-icon">💰</div>
+          <div class="stat-content">
+            <p class="stat-label">Salariu sugerat</p>
+            <p class="stat-value" id="salaryRange">—</p>
+            <p class="stat-sub">brut lunar, RON</p>
+          </div>
+        </div>
+
+        <!-- European Comparison (Main Gap) -->
+        <div class="stat-card glass-card" id="euCard">
+          <div class="stat-icon" id="euIcon">🌍</div>
+          <div class="stat-content">
+            <p class="stat-label">vs. Europa (Vest)</p>
+            <p class="stat-value" id="euValue">—</p>
+            <p class="stat-sub" id="euSub">medie Vest în EUR</p>
+          </div>
+        </div>
+
+        <!-- Market RO Comparison -->
+        <div class="stat-card glass-card" id="compCard">
+          <div class="stat-icon" id="compIcon"><span class="ro-flag">RO</span></div>
+          <div class="stat-content">
+            <p class="stat-label">vs. Piața România</p>
+            <p class="stat-value" id="compValue">—</p>
+            <p class="stat-sub" id="compSub">medie RO în RON</p>
+          </div>
+        </div>
+
+        <!-- Annual Impact -->
+        <div class="stat-card glass-card impact-card" id="impactCard">
+          <div class="stat-icon" id="impactIcon">💣</div>
+          <div class="stat-content">
+            <p class="stat-label" id="impactLabel">Pierdere anuală estimată</p>
+            <p class="stat-value impact-value" id="annualDiff">—</p>
+            <p class="stat-sub">RON / an</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- AI Explanation -->
+      <div class="explanation-card glass-card" id="explanationCard">
+        <div class="explanation-header">
+          <span class="ai-badge">✨ AI Insight</span>
+        </div>
+        <p class="explanation-text" id="explanationText"></p>
+      </div>
+
+      <!-- Share + Actions -->
+      <div class="actions-row">
+        <button id="shareBtn" class="share-button" aria-label="Distribuie rezultatul">
+          <span>📣</span> Distribuie rezultatul
+        </button>
+        <button id="retryBtn" class="retry-button" aria-label="Analizează alt salariu">
+          <span>🔄</span> Analizează alt salariu
+        </button>
+      </div>
+
+      <!-- AdSense Banner - Results -->
+      <div class="ad-container mt-4">
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client="ca-pub-YOUR_PUBLISHER_ID"
+             data-ad-slot="YOUR_AD_SLOT_ID_HERE"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+        <script>
+             (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
+      </div>
+
+      <!-- Toast notification -->
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>© 2026 SalariuOK.ro · Date anonime · Construit pentru piața din România</p>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
