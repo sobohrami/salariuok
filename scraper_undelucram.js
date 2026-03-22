@@ -174,126 +174,181 @@ async function scrapeHomepageSalaries() {
 // SCRAPER 2: Company salary pages (public data)
 // ──────────────────────────────────────────────
 
-/**
- * Many company pages exist at /ro/salarii-[slug]-[id]
- * We'll try a list of popular/known companies to harvest more entries.
- */
-const COMPANY_PAGES = [
+const MANUAL_PAGES = [
+  { slug: 'lactalis-totul-despre-mediul-de-lucru', id: 39047 },
+  { slug: 'jti-romania-totul-despre-mediul-de-lucru-salariu', id: 145 },
+  { slug: 'booking-holdings-totul-despre-mediul-de-lucru', id: 144793 },
+  { slug: 'jysk-romania-mediul-de-lucru', id: 1093 },
   { slug: 'kpmg-romania-totul-despre-mediul-de-lucru-interviu', id: 120 },
   { slug: 'oracle-totul-despre-mediul-de-lucru-interviu-salariu', id: 19 },
-  { slug: 'brd-totul-despre-mediul-de-lucru-interviu-salariu', id: 80 },
-  { slug: 'ing-bank-romania-totul-despre-mediul-de-lucru-interviu', id: 90 },
-  { slug: 'vodafone-romania-totul-despre-mediul-de-lucru-interviu', id: 55 },
-  { slug: 'telekom-romania-totul-despre-mediul-de-lucru-interviu', id: 91 },
-  { slug: 'bcr-totul-despre-mediul-de-lucru-interviu-salariu', id: 78 },
-  { slug: 'amazon-romania-totul-despre-mediul-de-lucru-interviu', id: 150 },
-  { slug: 'microsoft-romania-totul-despre-mediul-de-lucru-interviu', id: 45 },
-  { slug: 'ibm-romania-totul-despre-mediul-de-lucru-interviu', id: 88 },
-  { slug: 'orange-romania-totul-despre-mediul-de-lucru-interviu', id: 92 },
-  { slug: 'unicredit-bank-totul-despre-mediul-de-lucru-interviu', id: 112 },
-  { slug: 'raiffeisen-bank-totul-despre-mediul-de-lucru-interviu', id: 113 },
-  { slug: 'pwc-romania-totul-despre-mediul-de-lucru-interviu', id: 114 },
-  { slug: 'deloitte-romania-totul-despre-mediul-de-lucru-interviu', id: 118 },
-  { slug: 'ernst-young-totul-despre-mediul-de-lucru-interviu', id: 119 },
-  { slug: 'accenture-romania-totul-despre-mediul-de-lucru-interviu', id: 145 },
-  { slug: 'capgemini-romania-totul-despre-mediul-de-lucru-interviu', id: 155 },
-  { slug: 'cognizant-romania-totul-despre-mediul-de-lucru-interviu', id: 175 },
-  { slug: 'wipro-romania-totul-despre-mediul-de-lucru-interviu', id: 176 },
-  { slug: 'continental-automotive-totul-despre-mediul-de-lucru-interviu', id: 200 },
-  { slug: 'bosch-service-totul-despre-mediul-de-lucru-interviu', id: 201 },
-  { slug: 'gloriafood-totul-despre-mediul-de-lucru', id: 3938 },
-  { slug: 'alcatel-lucent-totul-despre-mediul-de-lucru-interviu', id: 162 },
-  { slug: 'endress-zenessis-group-totul-despre-mediul-de-lucru', id: 184175 },
+  { slug: 'emag-romania-totul-despre-mediul-de-lucru-interviu', id: 28 },
 ];
 
-async function scrapeCompanyPage(slug, id) {
-  const url = `${BASE_URL}/ro/salarii-${slug}-${id}`;
-  const results = [];
-
+async function scrapeTopCompanies() {
+  console.log('\n🌟 Se preiau companiile de pe pagina Top...');
+  const companies = [];
   try {
-    const response = await axios.get(url, { headers: HEADERS, timeout: 15000 });
+    const response = await axios.get(`${BASE_URL}/ro/top`, { headers: HEADERS, timeout: 15000 });
     const $ = cheerio.load(response.data);
-
-    // Extract company name from page
-    const companyName = $('h1, .company-name, [class*="company"]').first().text().trim() || slug;
-
-    // Look for salary cards on the page (public portion before login wall)
-    $('div, article, li').each((_, el) => {
-      const text = $(el).text().trim();
-      if (!text.includes('Lei')) return;
-
-      const dateMatch = text.match(/(\d{2}\.\d{2}\.\d{4})/);
-      const salaryMatch = text.match(/([\d.,\s]+)\s*Lei/i);
-      if (!dateMatch || !salaryMatch) return;
-
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      let jobTitle = null;
-      let employmentStatus = null;
-      let jobType = null;
-
-      for (const line of lines) {
-        if (line.match(/\d{2}\.\d{2}\.\d{4}/)) continue;
-        if (line.match(/[\d.,]+\s*Lei/i)) continue;
-        if (line.match(/^\d+/)) continue;
-
-        if (!jobTitle && line.length > 2 && line.length < 80 && !line.includes('angajat') && !line.includes('Full-time') && !line.includes('Part-time')) {
-          jobTitle = line;
-        } else if (line.includes('angajat') || line.includes('Angajat')) {
-          const parts = line.split('-').map(p => p.trim());
-          employmentStatus = parts[0] || line;
-          jobType = parts[1] || null;
-        }
+    
+    // Caută toate linkurile care par a fi către salarii și extrage slug și ID
+    $('a[href*="/ro/prezentare-"]').each((_, el) => {
+      const href = $(el).attr('href');
+      // Se potrivește /ro/prezentare-titlu-companie-1234
+      const match = href.match(/\/ro\/prezentare-(.+)-(\d+)(\?.*)?$/);
+      if (match) {
+        companies.push({ slug: match[1], id: parseInt(match[2], 10) });
       }
-
-      if (!jobTitle) return;
-
-      const { date, year } = parseDate(dateMatch[1]);
-      const salary_ron = parseSalary(salaryMatch[1]);
-      if (!salary_ron) return;
-
-      results.push({
-        date,
-        year,
-        salary_ron,
-        job_title: jobTitle,
-        employment_status: employmentStatus,
-        job_type: jobType,
-        company: companyName,
-        source_url: url,
-        scraped_at: new Date().toISOString(),
-      });
     });
 
-    // Deduplicate
+    const unique = [];
     const seen = new Set();
-    return results.filter((r) => {
-      const key = `${r.date}|${r.salary_ron}|${r.job_title}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  } catch (err) {
-    // 404 or auth-wall → silently skip
-    if (err.response && (err.response.status === 404 || err.response.status === 403)) return [];
-    console.warn(`   ⚠️  ${url} → ${err.message}`);
+    for (const c of companies) {
+      if (!seen.has(c.id)) {
+        seen.add(c.id);
+        unique.push(c);
+      }
+    }
+    
+    console.log(`   ✅ S-au găsit ${unique.length} companii din topuri.`);
+    return unique;
+  } catch(e) {
+    console.warn(`   ⚠️ Eroare la preluarea topului de companii: ${e.message}`);
     return [];
   }
 }
+async function scrapeCompanyPage(slug, id) {
+  const baseUrl = `${BASE_URL}/ro/salarii-${slug}-${id}`;
+  const results = [];
+  
+  const currentYear = new Date().getFullYear();
+  // An limită calculat bazat pe preferința a ultimilor 5 ani
+  const MIN_YEAR = currentYear - 5;
+  let page = 1;
+  let companyName = slug;
+
+  while (page <= 20) { // Limităm strict paginile descărcate per firmă ca să evităm loop-uri masive
+    const url = page === 1 ? baseUrl : `${baseUrl}?page=${page}`;
+    try {
+      if (page > 1) await sleep(DELAY_MS);
+      const response = await axios.get(url, { headers: HEADERS, timeout: 15000 });
+      const $ = cheerio.load(response.data);
+
+      if (page === 1) {
+        companyName = $('h1, .company-name, [class*="company"]').first().text().trim() || slug;
+      }
+
+      let addedThisPage = 0;
+      let hasOldSalaries = false;
+
+      $('div, article, li').each((_, el) => {
+        const text = $(el).text().trim();
+        if (!text.includes('Lei')) return;
+
+        const dateMatch = text.match(/(\d{2}\.\d{2}\.\d{4})/);
+        const salaryMatch = text.match(/([\d.,\s]+)\s*Lei/i);
+        if (!dateMatch || !salaryMatch) return;
+
+        const { date, year } = parseDate(dateMatch[1]);
+        if (!year) return;
+
+        // Limitează la ultimii 5 ani. Salarile de obicei sunt sortate cronologic.
+        if (year < MIN_YEAR) {
+          hasOldSalaries = true;
+          return;
+        }
+
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        let jobTitle = null;
+        let employmentStatus = null;
+        let jobType = null;
+
+        for (const line of lines) {
+          if (line.match(/\d{2}\.\d{2}\.\d{4}/)) continue;
+          if (line.match(/[\d.,]+\s*Lei/i)) continue;
+          if (line.match(/^\d+/)) continue;
+
+          if (!jobTitle && line.length > 2 && line.length < 80 && !line.includes('angajat') && !line.includes('Full-time') && !line.includes('Part-time')) {
+            jobTitle = line;
+          } else if (line.includes('angajat') || line.includes('Angajat')) {
+            const parts = line.split('-').map(p => p.trim());
+            employmentStatus = parts[0] || line;
+            jobType = parts[1] || null;
+          }
+        }
+
+        if (!jobTitle) return;
+
+        const salary_ron = parseSalary(salaryMatch[1]);
+        if (!salary_ron) return;
+
+        results.push({
+          date,
+          year,
+          salary_ron,
+          job_title: jobTitle,
+          employment_status: employmentStatus,
+          job_type: jobType,
+          company: companyName,
+          source_url: url,
+          scraped_at: new Date().toISOString(),
+        });
+        addedThisPage++;
+      });
+
+      console.log(`     -> Pagina ${page}: extras ${addedThisPage} salarii reci (>= ${MIN_YEAR})`);
+
+      if (addedThisPage === 0) break; 
+      if (hasOldSalaries) {
+         console.log(`     -> Au fost detectate date mai vechi de ${MIN_YEAR}. Oprim paginarea la ${companyName}.`);
+         break;
+      }
+
+      page++;
+    } catch (err) {
+      if (err.response && (err.response.status === 404 || err.response.status === 403)) break;
+      console.warn(`   ⚠️ Eroare pe pagina ${page}: ${err.message}`);
+      break;
+    }
+  }
+
+  const seen = new Set();
+  return results.filter((r) => {
+    const key = `${r.date}|${r.salary_ron}|${r.job_title}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 async function scrapeAllCompanyPages() {
-  console.log(`\n🏢 Scraping ${COMPANY_PAGES.length} pagini de companii...`);
+  const topCompanies = await scrapeTopCompanies();
+  
+  // Îmbinăm sursele manuale și automate fără duplicate
+  const allTargets = [...MANUAL_PAGES];
+  const seenIds = new Set(MANUAL_PAGES.map(c => c.id));
+  
+  for (const tc of topCompanies) {
+    if (!seenIds.has(tc.id)) {
+      seenIds.add(tc.id);
+      allTargets.push(tc);
+    }
+  }
+
+  console.log(`\n🏢 Se va executa scraping avansat pe ${allTargets.length} firme...`);
   const all = [];
 
-  for (const { slug, id } of COMPANY_PAGES) {
+  for (const { slug, id } of allTargets) {
     await sleep(DELAY_MS);
+    console.log(`\n   => Verific firma: ${slug.split('-')[0].toUpperCase()} (ID: ${id})`);
     const entries = await scrapeCompanyPage(slug, id);
     if (entries.length > 0) {
-      console.log(`   ✅ ${slug.split('-')[0]} → ${entries.length} salarii`);
+      console.log(`   ✅ Total extras de la ${slug.split('-')[0]}: ${entries.length} salarii`);
       all.push(...entries);
     }
   }
 
-  console.log(`   ✅ Total din pagini companii: ${all.length} salarii`);
+  console.log(`   ✅ Total extras din sursele paginate: ${all.length} salarii.`);
   return all;
 }
 

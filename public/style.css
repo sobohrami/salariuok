@@ -58,8 +58,8 @@ body {
 /* ===== HEADER ===== */
 .site-header {
   position: relative; z-index: 10;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 20px 32px;
+  display: flex; align-items: center; justify-content: center; /* Centrare logo */
+  padding: 24px 32px;
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
   background: rgba(10, 14, 26, 0.7);
@@ -69,7 +69,7 @@ body {
 .logo-icon { font-size: 1.5rem; }
 .logo-text { font-size: 1.25rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
 .logo-dot { color: var(--teal); }
-.header-stats { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
+.header-stats { position: absolute; right: 32px; font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
 .header-stats span { color: var(--teal); font-weight: 700; }
 
 /* ===== SECTIONS ===== */
@@ -405,6 +405,7 @@ input[type=range]::-webkit-slider-thumb:hover { box-shadow: 0 0 20px rgba(0, 212
 
 /* ===== FOOTER ===== */
 .site-footer { position: relative; z-index: 5; text-align: center; padding: 24px 16px; font-size: 0.78rem; color: var(--text-muted); border-top: 1px solid var(--border); }
+.site-footer a:hover { color: var(--teal) !important; text-decoration: underline !important; }
 
 /* ===== ADS ===== */
 .ad-container { width: 100%; max-width: 600px; min-height: 90px; margin: 0 auto; text-align: center; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; position: relative; }
