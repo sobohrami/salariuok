@@ -1,6 +1,9 @@
 // Hardcoded Romanian salary benchmark data (monthly, RON, gross)
 // Structure: jobCategory -> cityTier -> experienceTier -> median salary
 
+const fs = require('fs');
+const path = require('path');
+
 const cityTiers = {
   // Tier 1 - Major cities
   'bucurești': 1, 'bucharest': 1,
@@ -134,7 +137,66 @@ function getExperienceTier(years) {
 function getMedianSalary(normalizedJobTitle, location, yearsExperience) {
   const jobKey = normalizedJobTitle.toLowerCase().trim();
 
-  // Find best matching benchmark
+  const expTier = getExperienceTier(yearsExperience);
+  const cityTier = getCityTier(location);
+  const cityMultiplier = cityMultipliers[cityTier] || 0.65;
+
+  // 1. Check Real Market Data first (scraped from Undelucram + User submissions)
+  let realSalaries = [];
+  try {
+    const scrapedPath = path.join(__dirname, 'scraped_salaries.json');
+    if (fs.existsSync(scrapedPath)) {
+      const scrapedData = JSON.parse(fs.readFileSync(scrapedPath, 'utf8'));
+      if (scrapedData && Array.isArray(scrapedData.entries)) {
+        for (const entry of scrapedData.entries) {
+          if (!entry.job_title || !entry.salary_ron) continue;
+          if (entry.job_title.toLowerCase().includes(jobKey) || jobKey.includes(entry.job_title.toLowerCase())) {
+            // Ignore extreme outliers or missing data
+            if (entry.salary_ron >= 1500 && entry.salary_ron <= 60000) {
+              realSalaries.push(entry.salary_ron);
+            }
+          }
+        }
+      }
+    }
+
+    const dbPath = path.join(__dirname, 'salary_data.json');
+    if (fs.existsSync(dbPath)) {
+      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+      if (dbData && Array.isArray(dbData.entries)) {
+        for (const entry of dbData.entries) {
+          if (!entry.job_title || !entry.salary) continue;
+          const userJob = entry.job_title.toLowerCase();
+          const normJob = entry.normalized_job_title ? entry.normalized_job_title.toLowerCase() : '';
+          
+          if (userJob.includes(jobKey) || jobKey.includes(userJob) || normJob.includes(jobKey) || jobKey.includes(normJob)) {
+            // Filter out test spam like 111111 or 50000 "prostituata" by strict bounds
+            if (entry.salary >= 1500 && entry.salary <= 45000) {
+              realSalaries.push(entry.salary);
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Eroare la citirea datelor reale:', e.message);
+  }
+
+  if (realSalaries.length > 0) {
+    // We found real data! Calculate median/average
+    const sum = realSalaries.reduce((a, b) => a + b, 0);
+    const avgReal = sum / realSalaries.length;
+
+    // The scraped data is an average over all seniorities and cities. 
+    // We adjust this base average dynamically for the specific user context.
+    const expMultipliers = [0.8, 1.0, 1.4, 1.8]; // junior, mid, senior, lead
+    let adjustedReal = avgReal * cityMultiplier * expMultipliers[expTier];
+    
+    console.log(`[ANALYSIS] Used ${realSalaries.length} real market data points for "${normalizedJobTitle}". Base Avg: ${Math.round(avgReal)}`);
+    return Math.round(adjustedReal);
+  }
+
+  // 2. FALLBACK to hardcoded benchmarks if no real data exists for this specific niche
   let benchmarkKey = 'default';
   let bestMatchLength = 0;
 
@@ -147,10 +209,6 @@ function getMedianSalary(normalizedJobTitle, location, yearsExperience) {
       }
     }
   }
-
-  const expTier = getExperienceTier(yearsExperience);
-  const cityTier = getCityTier(location);
-  const cityMultiplier = cityMultipliers[cityTier] || 0.65;
 
   const baseMedian = salaryBenchmarks[benchmarkKey][expTier];
   return Math.round(baseMedian * cityMultiplier);
