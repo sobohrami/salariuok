@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { normalizeJobTitle, generateExplanation, estimateEuropeanSalary } = require('./openai');
+const { validateAndNormalizeInput, generateExplanation, estimateEuropeanSalariesMulti, estimateFreelanceIncome } = require('./openai');
 const { getMedianSalary } = require('./salaryData');
 const { saveEntry, getStats } = require('./db');
 
@@ -29,28 +29,64 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(400).json({ error: 'Experiența trebuie să fie un număr valid.' });
     }
 
-    // 1. Normalize job title
-    const normalizedTitle = await normalizeJobTitle(jobTitle.trim());
+    // 1. Normalize job title & Validate Input
+    const inputStatus = await validateAndNormalizeInput(jobTitle.trim(), location.trim());
+    
+    if (!inputStatus.isValid) {
+      return res.status(400).json({ error: inputStatus.reason || 'Jobul sau locația introduse nu par a fi valide.' });
+    }
+    const normalizedTitle = inputStatus.normalizedTitle;
 
-    // 2. Fetch European and Romanian Median Salaries
-    const euMedianEur = await estimateEuropeanSalary(normalizedTitle, yearsExperience);
-    const euMedianRon = euMedianEur * 5; // Approx 5 RON = 1 EUR
-    const romanianMedianSalary = getMedianSalary(normalizedTitle, location, yearsExperience);
+    // 2. Fetch all salary data in parallel
+    const [euRegions, freelanceData, romanianMedianSalary] = await Promise.all([
+      estimateEuropeanSalariesMulti(normalizedTitle, yearsExperience),
+      estimateFreelanceIncome(normalizedTitle, yearsExperience),
+      Promise.resolve(getMedianSalary(normalizedTitle, location, yearsExperience)),
+    ]);
 
-    // 3. Calculations (Comparing strictly against EUROPEAN Median)
-    const rawScore = (salary / euMedianRon) * 100;
+    const EUR_TO_RON = 5;
+
+    // 3. Score: compared against LOCAL Romanian median for this city/job (location-aware)
+    const localBenchmark = romanianMedianSalary; // already city-aware from salaryData.js
+    const rawScore = (salary / localBenchmark) * 100;
     const score = Math.min(100, Math.max(0, Math.round(rawScore)));
 
-    const minSalary = Math.round(euMedianRon * 0.8);
-    const maxSalary = Math.round(euMedianRon * 1.2);
+    // Suggested range based on local market (±20% of local median)
+    const minSalary = Math.round(localBenchmark * 0.9);
+    const maxSalary = Math.round(localBenchmark * 1.3);
 
-    const euDifference = salary - euMedianRon;
-    const euPercentageDiff = (euDifference / euMedianRon) * 100;
+    // EU West comparison (informational)
+    const euWestRon = euRegions.west * EUR_TO_RON;
+    const euDifference = salary - euWestRon;
+    const euPercentageDiff = (euDifference / euWestRon) * 100;
     const annualDiff = Math.round(euDifference * 12);
 
-    // Romanian Comparison
+    // Romanian local comparison
     const roDifference = salary - romanianMedianSalary;
     const roPercentageDiff = (roDifference / romanianMedianSalary) * 100;
+
+    // Freelance gap calculations
+    const freelanceMonthlyRon = freelanceData.monthlyRon;
+    const freelanceMonthlyEur = freelanceData.monthlyEur;
+    const freelanceAnnualGapRon = Math.round((freelanceMonthlyRon - salary) * 12);
+
+    // EU regions with percentage vs user salary
+    const euRegionsWithDiff = {
+      east: euRegions.east,
+      eastCountry: euRegions.eastCountry,
+      eastRon: euRegions.east * EUR_TO_RON,
+      eastDiffPct: parseFloat((((euRegions.east * EUR_TO_RON) - salary) / salary * 100).toFixed(1)),
+
+      west: euRegions.west,
+      westCountry: euRegions.westCountry,
+      westRon: euRegions.west * EUR_TO_RON,
+      westDiffPct: parseFloat((((euRegions.west * EUR_TO_RON) - salary) / salary * 100).toFixed(1)),
+
+      south: euRegions.south,
+      southCountry: euRegions.southCountry,
+      southRon: euRegions.south * EUR_TO_RON,
+      southDiffPct: parseFloat((((euRegions.south * EUR_TO_RON) - salary) / salary * 100).toFixed(1)),
+    };
 
     // 4. Score label
     let scoreLabel, scoreEmoji;
@@ -60,16 +96,19 @@ app.post('/api/analyze', async (req, res) => {
     else { scoreLabel = 'Excelent'; scoreEmoji = '😎'; }
 
     // 5. AI explanation
-    const explanation = await generateExplanation(normalizedTitle, location, score, euPercentageDiff, euMedianRon, currency, romanianMedianSalary);
+    const explanation = await generateExplanation(
+      normalizedTitle, location, score, euPercentageDiff,
+      euRegions, romanianMedianSalary, freelanceMonthlyRon, salary
+    );
 
-    // 6. Save to DB (Persistent)
+    // 6. Save to DB
     await saveEntry({
       jobTitle: jobTitle.trim(),
       normalizedJobTitle: normalizedTitle,
       location: location.trim(),
       yearsExperience,
       salary,
-      medianSalary: euMedianRon,
+      medianSalary: euWestRon,
       score,
     });
 
@@ -79,15 +118,19 @@ app.post('/api/analyze', async (req, res) => {
       score,
       scoreLabel,
       scoreEmoji,
-      medianSalary: euMedianRon,
+      medianSalary: euWestRon,
       minSalary,
       maxSalary,
       difference: Math.round(euDifference),
       percentageDiff: parseFloat(euPercentageDiff.toFixed(1)),
       annualDiff,
-      euMedianEur,
+      euMedianEur: euRegions.west,
       roMedianRon: romanianMedianSalary,
       roPercentageDiff: parseFloat(roPercentageDiff.toFixed(1)),
+      euRegions: euRegionsWithDiff,
+      freelanceMonthlyEur,
+      freelanceMonthlyRon,
+      freelanceAnnualGapRon,
       explanation,
       currency,
     });
