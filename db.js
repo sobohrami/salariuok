@@ -44,6 +44,17 @@ function saveLocalData(data) {
 async function saveEntry(entry) {
   const { jobTitle, normalizedJobTitle, location, yearsExperience, salary, medianSalary, score } = entry;
 
+  // Simple suspicious detection
+  let isSuspicious = false;
+  const ratio = salary / 3500; // Baseline net avg
+  if (yearsExperience <= 1 && salary > 12000) isSuspicious = true;
+  if (salary > 40000 && yearsExperience < 5) isSuspicious = true;
+  
+  // High salary for low-barrier/manual jobs (if detection is obvious)
+  const lowBarrierWords = ['muncitor', 'lucrator', 'vanzator', 'picol', 'curier', 'gunoier', 'sofer'];
+  const lowerTitle = jobTitle.toLowerCase();
+  if (lowBarrierWords.some(w => lowerTitle.includes(w)) && salary > 8000) isSuspicious = true;
+
   if (isSupabaseConfigured) {
     try {
       const supabase = createClient(supabaseUrl, supabaseKey);
@@ -57,6 +68,7 @@ async function saveEntry(entry) {
           salary,
           median_salary: medianSalary,
           score,
+          is_suspicious: isSuspicious
         }]);
       if (!error) return true;
       console.error('Supabase insert error:', error.message);
@@ -77,6 +89,7 @@ async function saveEntry(entry) {
     salary,
     median_salary: medianSalary,
     score,
+    is_suspicious: isSuspicious,
     timestamp: new Date().toISOString(),
   });
   return saveLocalData(data);
@@ -106,13 +119,27 @@ async function getStats() {
     }
   }
 
-  // Fallback to local JSON
+  // Fallback to local JSON (or combined stats)
   const data = loadLocalData();
   const count = data.entries.length;
+
+  let scrapedCount = 0;
+  try {
+    const SCRAPED_PATH = path.join(__dirname, 'scraped_salaries.json');
+    if (fs.existsSync(SCRAPED_PATH)) {
+      const scrapedData = JSON.parse(fs.readFileSync(SCRAPED_PATH, 'utf8'));
+      if (scrapedData && Array.isArray(scrapedData.entries)) {
+        scrapedCount = scrapedData.entries.length;
+      }
+    }
+  } catch (e) {}
+
+  const total = count + scrapedCount;
   const avgScore = count > 0
     ? Math.round(data.entries.reduce((s, e) => s + (e.score || 0), 0) / count)
     : null;
-  return { totalAnalyses: count, averageScore: avgScore };
+    
+  return { totalAnalyses: total, averageScore: avgScore };
 }
 
 module.exports = { saveEntry, getStats };

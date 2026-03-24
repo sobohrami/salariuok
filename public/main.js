@@ -146,8 +146,10 @@ function validateForm() {
   if (!locationInput.value.trim()) { setError('group-location', 'location-error', 'Te rugăm să introduci orașul.'); valid = false; }
   else setError('group-location', 'location-error', '');
   const sal = parseFloat(salaryInput.value);
-  if (!salaryInput.value || isNaN(sal) || sal <= 0) { setError('group-salary', 'salary-error', 'Te rugăm să introduci un salariu valid.'); valid = false; }
-  else setError('group-salary', 'salary-error', '');
+  if (!salaryInput.value || isNaN(sal) || sal < 1500 || sal > 100000) { 
+    setError('group-salary', 'salary-error', 'Te rugăm să introduci un salariu valid între 1.500 și 100.000 RON.'); 
+    valid = false; 
+  } else setError('group-salary', 'salary-error', '');
   return valid;
 }
 
@@ -425,7 +427,11 @@ async function fetchStats() {
     const res = await fetch('/api/stats');
     if (!res.ok) return;
     const { totalAnalyses } = await res.json();
-    if (totalAnalyses > 0) headerStats.innerHTML = `<span>${totalAnalyses.toLocaleString('ro-RO')}</span> analize efectuate`;
+    if (totalAnalyses > 0) {
+      headerStats.innerHTML = `<span>${totalAnalyses.toLocaleString('ro-RO')}</span> salarii reale verificate`;
+      const heroTotal = document.getElementById('heroTotalSalaries');
+      if (heroTotal) heroTotal.textContent = totalAnalyses.toLocaleString('ro-RO');
+    }
   } catch (_) { }
 }
 fetchStats();
