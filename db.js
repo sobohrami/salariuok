@@ -12,6 +12,15 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const isSupabaseConfigured = supabaseUrl && supabaseKey && createClient;
 
+// Singleton Supabase client
+let supabaseInstance = null;
+function getSupabase() {
+  if (!supabaseInstance && isSupabaseConfigured) {
+    supabaseInstance = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseInstance;
+}
+
 const DB_PATH = path.join(__dirname, 'salary_data.json');
 
 // --- JSON FALLBACK HELPERS ---
@@ -39,37 +48,46 @@ function saveLocalData(data) {
 // --- MAIN DATABASE FUNCTIONS ---
 
 /**
- * Saves a salary entry to Supabase (primary) or JSON (fallback)
+ * Saves one or more salary entries to Supabase (primary) or JSON (fallback)
  */
-async function saveEntry(entry) {
-  const { jobTitle, normalizedJobTitle, location, yearsExperience, salary, medianSalary, score } = entry;
-
-  // Simple suspicious detection
-  let isSuspicious = false;
-  const ratio = salary / 3500; // Baseline net avg
-  if (yearsExperience <= 1 && salary > 12000) isSuspicious = true;
-  if (salary > 40000 && yearsExperience < 5) isSuspicious = true;
+async function saveEntry(entryOrEntries) {
+  const isBatch = Array.isArray(entryOrEntries);
+  const entries = isBatch ? entryOrEntries : [entryOrEntries];
   
-  // High salary for low-barrier/manual jobs (if detection is obvious)
-  const lowBarrierWords = ['muncitor', 'lucrator', 'vanzator', 'picol', 'curier', 'gunoier', 'sofer'];
-  const lowerTitle = jobTitle.toLowerCase();
-  if (lowBarrierWords.some(w => lowerTitle.includes(w)) && salary > 8000) isSuspicious = true;
+  const processedEntries = entries.map(entry => {
+    const { jobTitle, normalizedJobTitle, location, yearsExperience, salary, medianSalary, score, source, company } = entry;
+    
+    // Simple suspicious detection
+    let isSuspicious = false;
+    if (yearsExperience <= 1 && salary > 12000) isSuspicious = true;
+    if (salary > 40000 && yearsExperience < 5) isSuspicious = true;
+    
+    // High salary for low-barrier/manual jobs
+    const lowBarrierWords = ['muncitor', 'lucrator', 'vanzator', 'picol', 'curier', 'gunoier', 'sofer'];
+    const lowerTitle = (jobTitle || '').toLowerCase();
+    if (lowBarrierWords.some(w => lowerTitle.includes(w)) && salary > 8000) isSuspicious = true;
 
-  if (isSupabaseConfigured) {
+    return {
+      job_title: jobTitle,
+      normalized_job_title: normalizedJobTitle,
+      location,
+      years_experience: yearsExperience,
+      salary,
+      median_salary: medianSalary,
+      score,
+      is_suspicious: isSuspicious,
+      source: source || 'user',
+      company: company || null
+    };
+  });
+
+  const supabase = getSupabase();
+  if (supabase) {
     try {
-      const supabase = createClient(supabaseUrl, supabaseKey);
       const { error } = await supabase
         .from('salary_entries')
-        .insert([{
-          job_title: jobTitle,
-          normalized_job_title: normalizedJobTitle,
-          location,
-          years_experience: yearsExperience,
-          salary,
-          median_salary: medianSalary,
-          score,
-          is_suspicious: isSuspicious
-        }]);
+        .insert(processedEntries);
+        
       if (!error) return true;
       console.error('Supabase insert error:', error.message);
     } catch (err) {
@@ -77,21 +95,18 @@ async function saveEntry(entry) {
     }
   }
 
-  // Fallback to local JSON if Supabase fails or isn't configured
-  console.log('Using local JSON fallback for saving entry...');
+  // Fallback to local JSON
+  console.log(`Using local JSON fallback for saving ${processedEntries.length} entries...`);
   const data = loadLocalData();
-  data.entries.push({
-    id: Date.now(),
-    job_title: jobTitle,
-    normalized_job_title: normalizedJobTitle,
-    location,
-    years_experience: yearsExperience,
-    salary,
-    median_salary: medianSalary,
-    score,
-    is_suspicious: isSuspicious,
-    timestamp: new Date().toISOString(),
+  
+  processedEntries.forEach(pe => {
+    data.entries.push({
+      id: Date.now() + Math.random(),
+      ...pe,
+      timestamp: new Date().toISOString(),
+    });
   });
+  
   return saveLocalData(data);
 }
 
@@ -99,9 +114,9 @@ async function saveEntry(entry) {
  * Gets overview stats from Supabase (primary) or JSON (fallback)
  */
 async function getStats() {
-  if (isSupabaseConfigured) {
+  const supabase = getSupabase();
+  if (supabase) {
     try {
-      const supabase = createClient(supabaseUrl, supabaseKey);
       const { data, error, count } = await supabase
         .from('salary_entries')
         .select('score', { count: 'exact' });
@@ -109,7 +124,7 @@ async function getStats() {
       if (!error) {
         const total = count || 0;
         const avgScore = total > 0
-          ? Math.round(data.reduce((s, e) => s + e.score, 0) / total)
+          ? Math.round(data.reduce((s, e) => s + (e.score || 0), 0) / data.length) // data contains scores for averaging
           : null;
         return { totalAnalyses: total, averageScore: avgScore };
       }
@@ -119,7 +134,7 @@ async function getStats() {
     }
   }
 
-  // Fallback to local JSON (or combined stats)
+  // Fallback to local JSON
   const data = loadLocalData();
   const count = data.entries.length;
 
@@ -141,5 +156,8 @@ async function getStats() {
     
   return { totalAnalyses: total, averageScore: avgScore };
 }
+
+module.exports = { saveEntry, getStats };
+
 
 module.exports = { saveEntry, getStats };

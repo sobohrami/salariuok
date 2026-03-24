@@ -134,69 +134,92 @@ function getExperienceTier(years) {
   return 3;
 }
 
-function getMedianSalary(normalizedJobTitle, location, yearsExperience) {
-  const jobKey = normalizedJobTitle.toLowerCase().trim();
+function normalizeJobTitle(title) {
+  if (!title) return '';
+  return title.toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/ă|â/g, 'a')
+    .replace(/ș|ş/g, 's')
+    .replace(/ț|ţ/g, 't')
+    .replace(/î|ì/g, 'i')
+    .replace(/ö|ó/g, 'o');
+}
 
+function jobTitlesMatch(title1, title2, minSimilarity = 0.5) {
+  const norm1 = normalizeJobTitle(title1);
+  const norm2 = normalizeJobTitle(title2);
+  
+  // Exact match or substring match
+  if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+  
+  // Simple word overlap check
+  const words1 = new Set(norm1.split(' '));
+  const words2 = new Set(norm2.split(' '));
+  const intersection = [...words1].filter(w => words2.has(w)).length;
+  const similarity = intersection / Math.max(words1.size, words2.size);
+  
+  return similarity >= minSimilarity;
+}
+
+function calculateMedian(values) {
+  if (!values || values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/**
+ * Note: getScrapedSalariesForJob has been deprecated as data was migrated to salary_data.json/Supabase.
+ */
+function getScrapedSalariesForJob(normalizedJobTitle) {
+  return []; // Data is now in salary_data.json or Supabase
+}
+
+function getMedianSalary(normalizedJobTitle, location, yearsExperience) {
   const expTier = getExperienceTier(yearsExperience);
   const cityTier = getCityTier(location);
   const cityMultiplier = cityMultipliers[cityTier] || 0.65;
 
-  // 1. Check Real Market Data first (scraped from Undelucram + User submissions)
-  let realSalaries = [];
-  try {
-    const scrapedPath = path.join(__dirname, 'scraped_salaries.json');
-    if (fs.existsSync(scrapedPath)) {
-      const scrapedData = JSON.parse(fs.readFileSync(scrapedPath, 'utf8'));
-      if (scrapedData && Array.isArray(scrapedData.entries)) {
-        for (const entry of scrapedData.entries) {
-          if (!entry.job_title || !entry.salary_ron) continue;
-          if (entry.job_title.toLowerCase().includes(jobKey) || jobKey.includes(entry.job_title.toLowerCase())) {
-            // Ignore extreme outliers or missing data
-            if (entry.salary_ron >= 1500 && entry.salary_ron <= 60000) {
-              realSalaries.push(entry.salary_ron);
-            }
-          }
-        }
-      }
-    }
+  // Experience multipliers: adjust base salary for seniority level
+  const expMultipliers = [0.75, 1.0, 1.35, 1.75]; // 0-2yrs, 3-5yrs, 6-10yrs, 10+yrs
 
+  // 1. Get salaries for this specific job from real market data
+  let scrapedSalaries = getScrapedSalariesForJob(normalizedJobTitle);
+  let userSalaries = [];
+  
+  try {
     const dbPath = path.join(__dirname, 'salary_data.json');
     if (fs.existsSync(dbPath)) {
       const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
       if (dbData && Array.isArray(dbData.entries)) {
         for (const entry of dbData.entries) {
           if (!entry.job_title || !entry.salary) continue;
-          const userJob = entry.job_title.toLowerCase();
           const normJob = entry.normalized_job_title ? entry.normalized_job_title.toLowerCase() : '';
-          
-          if (userJob.includes(jobKey) || jobKey.includes(userJob) || normJob.includes(jobKey) || jobKey.includes(normJob)) {
-            // Filter out test spam like 111111 or 50000 "prostituata" by strict bounds
+          if (jobTitlesMatch(entry.job_title, normalizedJobTitle, 0.4) || jobTitlesMatch(normJob, normalizedJobTitle, 0.4)) {
             if (entry.salary >= 1500 && entry.salary <= 45000) {
-              realSalaries.push(entry.salary);
+              userSalaries.push(entry.salary);
             }
           }
         }
       }
     }
   } catch (e) {
-    console.error('Eroare la citirea datelor reale:', e.message);
+    console.error('Error reading user salary data:', e.message);
   }
 
-  if (realSalaries.length > 0) {
-    // We found real data! Calculate median/average
-    const sum = realSalaries.reduce((a, b) => a + b, 0);
-    const avgReal = sum / realSalaries.length;
-
-    // The scraped data is an average over all seniorities and cities. 
-    // We adjust this base average dynamically for the specific user context.
-    const expMultipliers = [0.8, 1.0, 1.4, 1.8]; // junior, mid, senior, lead
-    let adjustedReal = avgReal * cityMultiplier * expMultipliers[expTier];
+  // 2. Calculate median from scraped + user data for this job
+  const allSalaries = [...scrapedSalaries, ...userSalaries];
+  if (allSalaries.length > 0) {
+    const baseMedian = calculateMedian(allSalaries);
+    const adjustedMedian = Math.round(baseMedian * cityMultiplier * expMultipliers[expTier]);
     
-    console.log(`[ANALYSIS] Used ${realSalaries.length} real market data points for "${normalizedJobTitle}". Base Avg: ${Math.round(avgReal)}`);
-    return Math.round(adjustedReal);
+    console.log(`[ANALYSIS] "${normalizedJobTitle}" @ ${location} (${yearsExperience}yrs): ${allSalaries.length} data points. Base median: ${Math.round(baseMedian)}, Adjusted: ${adjustedMedian} RON`);
+    return adjustedMedian;
   }
 
-  // 2. FALLBACK to hardcoded benchmarks if no real data exists for this specific niche
+  // 3. FALLBACK to hardcoded benchmarks if no real data
+  const jobKey = normalizedJobTitle.toLowerCase().trim();
   let benchmarkKey = 'default';
   let bestMatchLength = 0;
 
@@ -211,7 +234,9 @@ function getMedianSalary(normalizedJobTitle, location, yearsExperience) {
   }
 
   const baseMedian = salaryBenchmarks[benchmarkKey][expTier];
-  return Math.round(baseMedian * cityMultiplier);
+  const fallbackMedian = Math.round(baseMedian * cityMultiplier);
+  console.log(`[ANALYSIS] No real data for "${normalizedJobTitle}". Using benchmark "${benchmarkKey}": ${fallbackMedian} RON`);
+  return fallbackMedian;
 }
 
 module.exports = { getMedianSalary, getCityTier, getExperienceTier };
