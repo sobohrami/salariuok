@@ -59,6 +59,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+ 
+  <!-- Favicon / App Icons -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>💼</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>💼</text></svg>">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 
   <!-- Vercel Web Analytics -->
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
@@ -91,7 +96,7 @@
     <div class="hero-text">
       <p class="hero-eyebrow">🔎 Analiză salariu în timp real</p>
       <h1 class="hero-title">Ești plătit<br /><span class="gradient-text">corect?</span></h1>
-      <p class="hero-subtitle">Compară salariul tău cu piața din România și Europa. Descoperă ce ai putea câștiga de fapt.</p>
+      <p class="hero-subtitle">Compară salariul tău cu piața din România și Europa. Bazat pe peste <strong id="heroTotalSalaries">700+</strong> salarii reale verificate.</p>
     </div>
 
     <form id="salaryForm" class="form-card glass-card" novalidate aria-label="Formular salariu">
@@ -129,7 +134,7 @@
         <label for="salary">Salariul lunar net (RON)</label>
         <div class="input-wrapper">
           <span class="input-icon">💰</span>
-          <input type="number" id="salary" name="salary" placeholder="ex: 5000" min="100" aria-required="true" aria-describedby="salary-error" />
+          <input type="number" id="salary" name="salary" placeholder="ex: 15000" min="1500" max="100000" aria-required="true" aria-describedby="salary-error" />
           <span class="input-suffix">RON</span>
         </div>
         <span class="field-error" id="salary-error" role="alert"></span>
